@@ -1,0 +1,107 @@
+#! /usr/bin/bash
+# Title: fetch_wttr
+# Date: 05-19-2024 
+# Author: TomHenry Reagan
+# More info at: https://wttr.in/:help
+#
+######################### LICENSE INFO #################################
+#    fetch_wttr: fetch weather reports from wttr.in, with i3status compatibility
+#    Copyright (C) 2024 TomHenry Reagan 
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#########################################################################
+
+run_fetch_wttr() {
+
+  # Handle options
+  TEMP=$(getopt --options hjl: --longoptions help,json,location: -n 'fetch_wttr' -- "$@")
+
+  if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
+
+  eval set -- "$TEMP"
+
+  HELP=false
+  LOCATION=
+  JSON=false
+  WTTR_PARAMS='F'
+
+  while true; do
+    case "$1" in
+      -l | --location ) LOCATION="$2"; shift 2 ;;
+      -j | --json ) JSON=true; shift ;;
+      -h | --help ) HELP=true; shift ;;
+      -- ) shift; break ;;
+      * ) break ;;
+    esac
+  done
+
+  # Handle HELP
+  if [[ -z "$LOCATION" && $HELP == false ]]; then 
+          echo "ERROR: --location not specified, printing help and exiting"
+          HELP=true
+  fi
+  
+  if [ $HELP == true ]; then
+    echo "
+  fetch_wttr -- fetch weather forecasts from wttr.in, with i3status compatibility
+  
+                 -l, --location [LOCATION], for format details, see: https://wttr.in/:help
+  
+                 -j, --json, output in JSON format (e.g. to display in i3status bar). If --json is not specified, output a human-readable weather report to stdout. 
+  
+                 -h, --help
+
+                 Dependencies: bash, getopt, curl"
+    exit 0
+  fi
+
+  # Form localized URL parameters for curl
+  if [[ -t 1 ]] && [[ "$(tput cols)" -lt 125 ]]; then
+      WTTR_PARAMS+='n'
+  fi 2> /dev/null
+  for _token in $( locale LC_MEASUREMENT ); do
+    case $_token in
+      1) WTTR_PARAMS+='m' ;;
+      2) WTTR_PARAMS+='u' ;;
+    esac
+  done 2> /dev/null
+  unset _token
+
+  # One-liner format for terminal/status-bar output 
+  if [[ $JSON == true ]]; then
+      WTTR_PARAMS+="&format=%l:+%c+%t+%w+%m+%S/%s"
+  fi
+
+  export WTTR_PARAMS
+
+  for p in $WTTR_PARAMS "$@"; do
+    args+=" --data-urlencode $p "
+  done
+
+  # wttr.in call
+  cmd='curl -fGsS -H "Accept-Language: ${LANG%_*}" --compressed "wttr.in/${LOCATION}?${WTTR_PARAMS}"'
+
+  if [[ $JSON == true ]]; then
+    # JSON format
+  	CURL_OUT=$(eval $cmd)
+    echo "{\"text\": \"${CURL_OUT}\"}"
+  else
+    # Term format
+    echo "INFO: Running $cmd"
+    eval $cmd
+  fi
+}
+
+run_fetch_wttr "$@"
+# END OF PROGRAM
