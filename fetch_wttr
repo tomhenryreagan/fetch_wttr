@@ -25,7 +25,7 @@
 run_fetch_wttr() {
 
   # Handle options
-  TEMP=$(getopt --options hjl:p: --longoptions help,json,location:,params: -n 'fetch_wttr' -- "$@")
+  TEMP=$(getopt --options hjvl:p: --longoptions help,json,verbose,location:,params: -n 'fetch_wttr' -- "$@")
 
   if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
 
@@ -37,6 +37,13 @@ run_fetch_wttr() {
   WTTR_PARAMS='F'
   OVERRIDE_PARAMS=''
   EXIT_CODE=0
+  VERBOSE=false
+
+  VERBOSE_OUTPUT=""
+  RED='\033[0;31m'
+  CYAN='\033[0;36m'
+  PINK='\033[0;35m'
+  NC='\033[0m'
 
   while true; do
     case "$1" in
@@ -44,6 +51,7 @@ run_fetch_wttr() {
       -p | --params ) OVERRIDE_PARAMS="$2"; shift 2 ;;
       -j | --json ) JSON=true; shift ;;
       -h | --help ) HELP=true; shift ;;
+      -v | --verbose ) VERBOSE=true; shift ;;
       -- ) shift; break ;;
       * ) break ;;
     esac
@@ -52,11 +60,11 @@ run_fetch_wttr() {
   # Handle HELP
   if [[ -z "$LOCATION" ]]; then
       if [[ -z "$WTTR_LOC" ]]; then
-          echo "ERROR: --location not specified and \$WTTR_LOC not set, printing help and exiting."
+          echo "${RED}ERROR:${NC} --location not specified and \$WTTR_LOC not set, printing help and exiting."
           HELP=true
           EXIT_CODE=1
       else
-          echo "INFO: Using default location, $WTTR_LOC"
+          VERBOSE_OUTPUT+="${CYAN}INFO:${NC} Using default location, ${PINK}$WTTR_LOC${NC}\n"
           LOCATION=$WTTR_LOC
       fi
   fi
@@ -72,6 +80,8 @@ run_fetch_wttr() {
                  -j, --json, output in JSON format (e.g. to display in i3status bar). If --json is not specified, output a human-readable weather report to stdout. 
 
                  -h, --help
+
+                 -v, --verbose, output additional information for debugging in the terminal
 
                  Dependencies: bash, getopt, curl"
     exit $EXIT_CODE
@@ -108,13 +118,18 @@ run_fetch_wttr() {
   # wttr.in call
   cmd='curl -fGsS -H "Accept-Language: ${LANG%_*}" --compressed "wttr.in/${LOCATION}?${WTTR_PARAMS}"'
 
+  # handle verbose output
+  if [[ $VERBOSE == true ]]; then
+     VERBOSE_OUTPUT+="${CYAN}INFO:${NC} Running ${cmd}\n\t${PINK}LOCATION${NC}=${LOCATION}\n\t${PINK}WTTR_PARAMS${NC}=${WTTR_PARAMS}\n\t${PINK}JSON${NC}=${JSON}\n\t${PINK}LANG${NC}=${LANG%_*}"
+     echo -e $VERBOSE_OUTPUT
+  fi
+
   if [[ $JSON == true ]]; then
     # JSON format
-  	CURL_OUT=$(eval $cmd)
+    CURL_OUT=$(eval $cmd)
     echo "{\"text\": \"${CURL_OUT}\"}"
   else
     # Term format
-    echo "INFO: Running $cmd"
     eval $cmd
   fi
   exit $EXIT_CODE
