@@ -1,4 +1,4 @@
-#! /usr/bin/bash
+# !/usr/bin/bash
 # Title: fetch_wttr
 # Date: 05-19-2024 
 # Author: TomHenry Reagan
@@ -25,20 +25,23 @@
 run_fetch_wttr() {
 
   # Handle options
-  TEMP=$(getopt --options hjl: --longoptions help,json,location: -n 'fetch_wttr' -- "$@")
+  TEMP=$(getopt --options hjl:p: --longoptions help,json,location:,params: -n 'fetch_wttr' -- "$@")
 
   if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
 
   eval set -- "$TEMP"
 
   HELP=false
-  LOCATION=
+  LOCATION=''
   JSON=false
   WTTR_PARAMS='F'
+  OVERRIDE_PARAMS=''
+  EXIT_CODE=0
 
   while true; do
     case "$1" in
       -l | --location ) LOCATION="$2"; shift 2 ;;
+      -p | --params ) OVERRIDE_PARAMS="$2"; shift 2 ;;
       -j | --json ) JSON=true; shift ;;
       -h | --help ) HELP=true; shift ;;
       -- ) shift; break ;;
@@ -47,40 +50,53 @@ run_fetch_wttr() {
   done
 
   # Handle HELP
-  if [[ -z "$LOCATION" && $HELP == false ]]; then 
-          echo "ERROR: --location not specified, printing help and exiting"
+  if [[ -z "$LOCATION" ]]; then
+      if [[ -z "$WTTR_LOC" ]]; then
+          echo "ERROR: --location not specified and \$WTTR_LOC not set, printing help and exiting."
           HELP=true
+          EXIT_CODE=1
+      else
+          echo "INFO: Using default location, $WTTR_LOC"
+          LOCATION=$WTTR_LOC
+      fi
   fi
   
   if [ $HELP == true ]; then
     echo "
   fetch_wttr -- fetch weather forecasts from wttr.in, with i3status compatibility
   
-                 -l, --location [LOCATION], for format details, see: https://wttr.in/:help
+                 -l, --location [LOCATION]. If not specified, will attempt to read from environment variable \$WTTR_LOC. For format details, see: https://wttr.in/:help
+                
+                 -p, --params [PARAMS], override default WTTR_PARAMS. For format details, see https://wttr.in/:help
   
                  -j, --json, output in JSON format (e.g. to display in i3status bar). If --json is not specified, output a human-readable weather report to stdout. 
-  
+
                  -h, --help
 
                  Dependencies: bash, getopt, curl"
-    exit 0
+    exit $EXIT_CODE
   fi
 
-  # Form localized URL parameters for curl
-  if [[ -t 1 ]] && [[ "$(tput cols)" -lt 125 ]]; then
-      WTTR_PARAMS+='n'
-  fi 2> /dev/null
-  for _token in $( locale LC_MEASUREMENT ); do
-    case $_token in
-      1) WTTR_PARAMS+='m' ;;
-      2) WTTR_PARAMS+='u' ;;
-    esac
-  done 2> /dev/null
-  unset _token
+  # Apply overrides if they exist
+  if [[ -z "$OVERRIDE_PARAMS" ]]; then
+    # Form localized URL parameters for curl
+    if [[ -t 1 ]] && [[ "$(tput cols)" -lt 125 ]]; then
+        WTTR_PARAMS+='n'
+    fi 2> /dev/null
+    for _token in $( locale LC_MEASUREMENT ); do
+      case $_token in
+        1) WTTR_PARAMS+='m' ;;
+        2) WTTR_PARAMS+='u' ;;
+      esac
+    done 2> /dev/null
+    unset _token
 
-  # One-liner format for terminal/status-bar output 
-  if [[ $JSON == true ]]; then
-      WTTR_PARAMS+="&format=%l:+%c+%t+%w+%m+%S/%s"
+    # One-liner format for terminal/status-bar output 
+    if [[ $JSON == true ]]; then
+        WTTR_PARAMS+="&format=%l:+%c+%t+%w+%m+%S/%s"
+    fi
+  else
+    WTTR_PARAMS=$OVERRIDE_PARAMS
   fi
 
   export WTTR_PARAMS
@@ -101,6 +117,7 @@ run_fetch_wttr() {
     echo "INFO: Running $cmd"
     eval $cmd
   fi
+  exit $EXIT_CODE
 }
 
 run_fetch_wttr "$@"

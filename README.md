@@ -11,7 +11,9 @@ Install to `/usr/bin`:
 
 ```
 # install -Dm755 -t /usr/bin fetch_wttr
-```
+``` 
+## Setting a default location
+Instead of specifying `--location` every call, you can set a default location using the `WTTR_LOC` environment variable, which takes the same format as the `--location` command-line option.
 
 ## i3status-rust block example
 To include an automatically updating weather report in i3status-rust, create the following custom block in your i3status-rust config, replacing `[LOCATION]` with your location:
