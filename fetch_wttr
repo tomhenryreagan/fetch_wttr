@@ -60,7 +60,7 @@ run_fetch_wttr() {
   # Handle HELP
   if [[ -z "$LOCATION" ]]; then
       if [[ -z "$WTTR_LOC" ]]; then
-          echo "${RED}ERROR:${NC} --location not specified and \$WTTR_LOC not set, printing help and exiting."
+          echo -e "${RED}ERROR:${NC} --location not specified and \$WTTR_LOC not set, printing help and exiting."
           HELP=true
           EXIT_CODE=1
       else
